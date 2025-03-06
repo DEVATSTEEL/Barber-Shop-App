@@ -58,7 +58,8 @@ export default function TabLayout() {
       {/* Hide unwanted tabs */}
       <Tabs.Screen name="explore" options={{ href: null }} />
       <Tabs.Screen name="confirm" options={{ href: null }} />
-
+      <Tabs.Screen name="login" options={{ href: null }} />
+      <Tabs.Screen name="signup" options={{ href: null }} />
     </Tabs>
   );
 }
