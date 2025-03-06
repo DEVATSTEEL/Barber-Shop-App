@@ -3,7 +3,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { FontAwesome } from '@expo/vector-icons';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -18,28 +18,47 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
+        tabBarStyle: {
+          backgroundColor: Colors[colorScheme ?? 'light'].background,
+          height: Platform.OS === 'ios' ? 80 : 60,
+          borderTopWidth: 0,
+          elevation: 5, // Adds shadow on Android
+          shadowOpacity: 0.1, // Adds shadow on iOS
+          position: 'absolute', // Makes it float on iOS
+        },
       }}>
+
+      {/* Home Tab */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
         }}
       />
+
+      {/* Bookings Tab */}
       <Tabs.Screen
-        name="explore"
+        name="booking"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Bookings',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="calendar" color={color} />,
         }}
       />
+
+      {/* Profile Tab */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="user" color={color} />,
+        }}
+      />
+
+      {/* Hide unwanted tabs */}
+      <Tabs.Screen name="explore" options={{ href: null }} />
+      <Tabs.Screen name="confirm" options={{ href: null }} />
+
     </Tabs>
   );
 }
