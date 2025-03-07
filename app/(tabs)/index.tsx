@@ -1,31 +1,32 @@
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import { useNavigation } from "@react-navigation/native"; // ✅ Use React Navigation instead of expo-router
+import { useNavigation } from "@react-navigation/native"; // ✅ Correct Navigation
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { HelloWave } from "@/components/HelloWave";
 import ParallaxScrollView from "@/components/ParallaxScrollView";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { memo } from "react"; // ✅ Optimize service rendering
 
 type Service = {
   id: string;
   name: string;
-  icon: () => JSX.Element; // ✅ Use function instead of direct JSX
+  icon: JSX.Element; // ✅ Store JSX directly instead of function call
 };
 
 const services: Service[] = [
-  { id: "1", name: "Haircuts", icon: () => <FontAwesome5 name="cut" size={28} color="#FFD509" /> },
-  { id: "2", name: "Beard Trims", icon: () => <MaterialCommunityIcons name="mustache" size={28} color="#FFD509" /> },
-  { id: "3", name: "Styling", icon: () => <MaterialCommunityIcons name="hair-dryer" size={28} color="#FFD509" /> },
-  { id: "4", name: "Hair Coloring", icon: () => <FontAwesome5 name="palette" size={28} color="#FFD509" /> },
-  { id: "5", name: "Scalp Treatment", icon: () => <MaterialCommunityIcons name="spa" size={28} color="#FFD509" /> },
-  { id: "6", name: "Facial & Skin Care", icon: () => <MaterialCommunityIcons name="face-woman" size={28} color="#FFD509" /> },
-  { id: "7", name: "Hot Towel Shaves", icon: () => <MaterialCommunityIcons name="shower" size={28} color="#FFD509" /> },
-  { id: "8", name: "Massage Therapy", icon: () => <MaterialCommunityIcons name="hands-pray" size={28} color="#FFD509" /> },
+  { id: "1", name: "Haircuts", icon: <FontAwesome5 name="cut" size={28} color="#FFD509" /> },
+  { id: "2", name: "Beard Trims", icon: <MaterialCommunityIcons name="mustache" size={28} color="#FFD509" /> },
+  { id: "3", name: "Styling", icon: <MaterialCommunityIcons name="hair-dryer" size={28} color="#FFD509" /> },
+  { id: "4", name: "Hair Coloring", icon: <FontAwesome5 name="palette" size={28} color="#FFD509" /> },
+  { id: "5", name: "Scalp Treatment", icon: <MaterialCommunityIcons name="spa" size={28} color="#FFD509" /> },
+  { id: "6", name: "Facial & Skin Care", icon: <MaterialCommunityIcons name="face-woman" size={28} color="#FFD509" /> },
+  { id: "7", name: "Hot Towel Shaves", icon: <MaterialCommunityIcons name="shower" size={28} color="#FFD509" /> },
+  { id: "8", name: "Massage Therapy", icon: <MaterialCommunityIcons name="hands-pray" size={28} color="#FFD509" /> },
 ];
 
-export default function HomeScreen() {
-  const navigation = useNavigation(); // ✅ Use React Navigation
+const HomeScreen = () => {
+  const navigation = useNavigation();
 
   return (
     <ParallaxScrollView
@@ -43,7 +44,10 @@ export default function HomeScreen() {
           {/* Booking Section */}
           <ThemedView style={styles.card}>
             <ThemedText type="subtitle" style={styles.cardTitle}>Your Hair, Your Style 💇‍♂️</ThemedText>
-            <TouchableOpacity style={styles.bookNowButton} onPress={() => navigation.navigate("booking" as never)}>
+            <TouchableOpacity
+              style={styles.bookNowButton}
+              onPress={() => navigation.navigate("booking" as never)} // ✅ Fixed navigation type
+            >
               <ThemedText style={styles.bookNowText}>Book Now</ThemedText>
             </TouchableOpacity>
           </ThemedView>
@@ -53,10 +57,7 @@ export default function HomeScreen() {
             <ThemedText type="subtitle" style={styles.cardTitle}>Our Services</ThemedText>
             <View style={styles.serviceGrid}>
               {services.map((item) => (
-                <View key={item.id} style={styles.serviceTile}>
-                  {item.icon()} {/* ✅ Call function to render icon */}
-                  <ThemedText style={styles.serviceText}>{item.name}</ThemedText>
-                </View>
+                <ServiceTile key={item.id} name={item.name} icon={item.icon} />
               ))}
             </View>
           </ThemedView>
@@ -64,15 +65,25 @@ export default function HomeScreen() {
       </View>
     </ParallaxScrollView>
   );
-}
+};
+
+// ✅ Optimized service tile component
+const ServiceTile = memo(({ name, icon }: { name: string; icon: JSX.Element }) => (
+  <View style={styles.serviceTile}>
+    {icon}
+    <ThemedText style={styles.serviceText}>{name}</ThemedText>
+  </View>
+));
+
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   fullContainer: {
-    flex: 1, // Ensures full height
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 100, // Ensures content is not cut off
+    paddingBottom: 100,
   },
   logo: {
     height: 150,
@@ -98,8 +109,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 20,
     marginBottom: 16,
-    borderWidth: 2,
+    borderWidth: 1.5, // ✅ Slightly reduced border for better UI
     borderColor: "#FFD509",
+    alignItems: "center",
   },
   cardTitle: {
     fontSize: 20,
@@ -113,6 +125,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
+    width: "100%",
   },
   bookNowText: {
     color: "#000000",
@@ -125,17 +138,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingBottom: 30,
+    width: "100%",
   },
   serviceTile: {
     backgroundColor: "#222222",
-    width: "45%", // Better spacing on mobile
+    width: "45%",
     aspectRatio: 1,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#FFD509",
-    marginBottom: 15, // Extra spacing to avoid content cutoff
+    marginBottom: 15,
   },
   serviceText: {
     fontSize: 12,

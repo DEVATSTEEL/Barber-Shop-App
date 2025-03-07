@@ -1,138 +1,40 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import React, { useState, useCallback, useMemo } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { auth, db } from "../firebaseConfig";  
+import { collection, addDoc } from "firebase/firestore"; 
+import { StackNavigationProp } from "@react-navigation/stack";
+import { useNavigation } from "@react-navigation/native";
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  card: {
-    backgroundColor: '#000',
-    padding: 24,
-    borderRadius: 12,
-    width: '85%',
-    alignItems: 'center',
-    shadowColor: '#FFD509',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFD509',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#FFD509',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  option: {
-    backgroundColor: '#FFD509',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginVertical: 10,
-    width: '100%',
-    alignItems: 'center',
-  },
-  optionText: {
-    fontSize: 18,
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  serviceTitle: {
-    fontSize: 18,
-    color: '#FFD509',
-    fontWeight: 'bold',
-    marginTop: 20,
-  },
-  serviceItem: {
-    backgroundColor: '#FFD509',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    marginVertical: 5,
-    width: '100%',
-    alignItems: 'center',
-  },
-  serviceText: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  serviceSelected: {
-    backgroundColor: '#000',
-    borderWidth: 1,
-    borderColor: '#FFD509',
-  },
-  serviceTextSelected: {
-    color: '#FFD509',
-  },
-  totalContainer: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#FFD509',
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  totalText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  button: {
-    backgroundColor: '#FFD509',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 16,
-    width: '100%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  buttonText: {
-    fontSize: 18,
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  disabledButton: {
-    backgroundColor: '#aaa',
-  },
-});
+type RootStackParamList = {
+  confirm: { date: string; time: string; services: string[]; totalPrice: number };
+};
+
+type NavigationProps = StackNavigationProp<RootStackParamList, "confirm">;
 
 export default function BookingScreen() {
-  const router = useRouter();
+  const navigation = useNavigation<NavigationProps>();
 
-  // Services List with Prices
   const services = [
-    { id: '1', name: 'Haircut ✂️', price: 500 },
-    { id: '2', name: 'Beard Trim 🧔', price: 300 },
-    { id: '3', name: 'Hair Coloring 🎨', price: 800 },
-    { id: '4', name: 'Scalp Treatment 💆', price: 700 },
-    { id: '5', name: 'Hot Towel Shave 🔥', price: 400 },
+    { id: "1", name: "Haircut ✂️", price: 500 },
+    { id: "2", name: "Beard Trim 🧔", price: 300 },
+    { id: "3", name: "Hair Coloring 🎨", price: 800 },
+    { id: "4", name: "Scalp Treatment 💆", price: 700 },
+    { id: "5", name: "Hot Towel Shave 🔥", price: 400 },
   ];
 
-  // State Management
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [totalPrice, setTotalPrice] = useState(0);
 
-  // Handles Date Selection
+  const totalPrice = useMemo(() => {
+    return selectedServices.reduce((total, id) => {
+      const service = services.find((s) => s.id === id);
+      return total + (service ? service.price : 0);
+    }, 0);
+  }, [selectedServices]);
+
   const onChangeDate = useCallback((event: DateTimePickerEvent, date?: Date) => {
     if (date) {
       setSelectedDate((prev) => new Date(date.setHours(prev.getHours(), prev.getMinutes())));
@@ -140,7 +42,6 @@ export default function BookingScreen() {
     setShowDatePicker(false);
   }, []);
 
-  // Handles Time Selection
   const onChangeTime = useCallback((event: DateTimePickerEvent, time?: Date) => {
     if (time) {
       setSelectedDate((prev) => new Date(prev.setHours(time.getHours(), time.getMinutes())));
@@ -148,71 +49,109 @@ export default function BookingScreen() {
     setShowTimePicker(false);
   }, []);
 
-  // Toggle Service Selection
-  const toggleService = useCallback((serviceId: string, price: number) => {
-    setSelectedServices((prevSelected) => {
-      const isSelected = prevSelected.includes(serviceId);
-      setTotalPrice((prevTotal) => (isSelected ? prevTotal - price : prevTotal + price));
-      return isSelected ? prevSelected.filter(id => id !== serviceId) : [...prevSelected, serviceId];
-    });
-  }, []);
-
-  // Handle Booking Confirmation
-  const confirmBooking = () => {
-    if (selectedServices.length === 0) return;
-    
-    const formattedTime = selectedDate.toLocaleTimeString();
-    const selectedServicesNames = services
-      .filter(service => selectedServices.includes(service.id))
-      .map(service => service.name)
-      .join(', ');
-
-    router.push(
-      `/confirm?date=${encodeURIComponent(selectedDate.toISOString())}&time=${encodeURIComponent(formattedTime)}&total=${totalPrice}&services=${encodeURIComponent(selectedServicesNames)}`
+  const toggleService = (serviceId: string) => {
+    setSelectedServices((prevSelected) =>
+      prevSelected.includes(serviceId)
+        ? prevSelected.filter((id) => id !== serviceId)
+        : [...prevSelected, serviceId]
     );
   };
 
+  const confirmBooking = async () => {
+    if (selectedServices.length === 0) {
+      Alert.alert("Selection Error", "Please select at least one service.");
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Login Required", "You must be logged in to book an appointment.");
+      return;
+    }
+
+    try {
+      const formattedDate = selectedDate.toDateString();
+      const formattedTime = selectedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      const selectedServiceNames = services
+        .filter((service) => selectedServices.includes(service.id))
+        .map((service) => service.name);
+
+      await addDoc(collection(db, "bookings"), {
+        userId: user.uid,
+        userEmail: user.email,
+        date: formattedDate,
+        time: formattedTime,
+        services: selectedServiceNames,
+        totalPrice: totalPrice,
+        status: "pending",
+        createdAt: new Date(),
+      });
+
+      navigation.navigate("confirm", {
+        date: formattedDate,
+        time: formattedTime,
+        services: selectedServiceNames,
+        totalPrice: totalPrice,
+      });
+
+    } catch (error) {
+      console.error("Error booking:", error);
+      Alert.alert("Booking Failed", "Failed to book appointment. Please try again.");
+    }
+  };
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
+  const handlePress = (option: string) => {
+    setSelectedOption(option);
+  };
+  
+  <TouchableOpacity 
+    style={[styles.option, selectedOption === "option1" && styles.optionSelected]} 
+    onPress={() => handlePress("option1")}
+  >
+    <Text style={[styles.optionText, selectedOption === "option1" && styles.optionTextSelected]}>
+      Option 1
+    </Text>
+  </TouchableOpacity>  
   return (
-    <LinearGradient colors={['#FFD509', '#000']} style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Book Your Appointment</Text>
-        <Text style={styles.subtitle}>Choose your preferred date & time.</Text>
 
-        {/* Date Selection */}
         <TouchableOpacity style={styles.option} onPress={() => setShowDatePicker(true)}>
           <Text style={styles.optionText}>📅 {selectedDate.toDateString()}</Text>
         </TouchableOpacity>
         {showDatePicker && <DateTimePicker value={selectedDate} mode="date" display="default" onChange={onChangeDate} />}
 
-        {/* Time Selection */}
         <TouchableOpacity style={styles.option} onPress={() => setShowTimePicker(true)}>
-          <Text style={styles.optionText}>⏰ {selectedDate.toLocaleTimeString()}</Text>
+          <Text style={styles.optionText}>⏰ {selectedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
         </TouchableOpacity>
         {showTimePicker && <DateTimePicker value={selectedDate} mode="time" display="default" onChange={onChangeTime} />}
 
-        {/* Service Selection */}
-        <Text style={styles.serviceTitle}>Select Services:</Text>
+        <Text style={styles.serviceTitle}>Choose Services:</Text>
         <FlatList
           data={services}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.serviceItem, selectedServices.includes(item.id) && styles.serviceSelected]}
-              onPress={() => toggleService(item.id, item.price)}
-            >
-              <Text style={[styles.serviceText, selectedServices.includes(item.id) && styles.serviceTextSelected]}>
-                {item.name} - ₹{item.price}
-              </Text>
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const isSelected = selectedServices.includes(item.id);
+            return (
+              <TouchableOpacity
+                style={[styles.serviceItem, isSelected && styles.serviceSelected]}
+                onPress={() => toggleService(item.id)}
+              >
+                <Text style={[styles.serviceText, isSelected && styles.serviceTextSelected]}>
+                  {item.name} - ₹{item.price}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
         />
 
-        {/* Total Price */}
         <View style={styles.totalContainer}>
           <Text style={styles.totalText}>Total: ₹{totalPrice}</Text>
         </View>
 
-        {/* Confirm Booking Button */}
         <TouchableOpacity
           style={[styles.button, selectedServices.length === 0 && styles.disabledButton]}
           onPress={confirmBooking}
@@ -221,6 +160,132 @@ export default function BookingScreen() {
           <Text style={styles.buttonText}>Confirm Booking</Text>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { 
+    flex: 1, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    backgroundColor: "#000" 
+  },
+  card: { 
+    width: "90%", 
+    padding: 24, 
+    backgroundColor: "#000",  // Black background
+    borderRadius: 12, 
+    alignItems: "center", 
+    borderWidth: 2, 
+    borderColor: "#FFD509",  // Yellow accent
+    shadowColor: "#FFD509", 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 6, 
+    elevation: 8, 
+  },
+  title: { 
+    fontSize: 24, 
+    fontWeight: "bold", 
+    color: "#FFD509",  // Yellow text
+    textAlign: "center", 
+    marginBottom: 10 
+  },
+  option: { 
+    padding: 15, 
+    backgroundColor: "#FFD509",  // Default black background
+    borderWidth: 2, 
+    borderColor: "#FFD509",  // Yellow accent
+    marginVertical: 5, 
+    borderRadius: 8, 
+    width: "100%", 
+    alignItems: "center" 
+  },
+  optionText: { 
+    fontSize: 18, 
+    textAlign: "center", 
+    color: "#000",  // Yellow text
+    fontWeight: "bold" 
+  },
+  optionSelected: { 
+    backgroundColor: "#FFD509",  // When clicked, fill with yellow
+  },
+  optionTextSelected: { 
+    color: "#000",  // Change text to black when clicked
+    fontWeight: "bold" 
+  },
+  serviceTitle: { 
+    fontSize: 18, 
+    fontWeight: "bold", 
+    marginTop: 10, 
+    color: "#FFD509" 
+  },
+  serviceItem: { 
+    padding: 12, 
+    marginVertical: 5, 
+    backgroundColor: "#000",  // Default black
+    borderWidth: 2, 
+    borderColor: "#FFD509", 
+    borderRadius: 8, 
+    width: "100%", 
+    alignItems: "center" 
+  },
+  serviceSelected: { 
+    backgroundColor: "#FFD509",  // Fill with yellow on click
+  },
+  serviceText: { 
+    fontSize: 16, 
+    textAlign: "center", 
+    color: "#FFD509",  // Default yellow text
+    fontWeight: "bold" 
+  },
+  serviceTextSelected: { 
+    color: "#000"  // Change text to black when clicked
+  },
+  totalContainer: { 
+    marginTop: 15, 
+    padding: 12, 
+    backgroundColor: "#FFD509",  // Black background
+    borderWidth: 2, 
+    borderColor: "#FFD509", 
+    borderRadius: 8, 
+    width: "100%", 
+    alignItems: "center" 
+  },
+  totalText: { 
+    fontSize: 20, 
+    fontWeight: "bold", 
+    color: "#000" 
+  },
+  button: { 
+    backgroundColor: "#FFD509",  // Default black
+    paddingVertical: 14, 
+    borderRadius: 8, 
+    marginTop: 16, 
+    width: "100%", 
+    alignItems: "center", 
+    borderWidth: 2, 
+    borderColor: "#FFD509", 
+    shadowColor: "#FFD509", 
+    shadowOffset: { width: 0, height: 3 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 4, 
+    elevation: 5 
+  },
+  buttonText: { 
+    textAlign: "center", 
+    color: "#000",  // Yellow text
+    fontSize: 18, 
+    fontWeight: "bold" 
+  },
+  buttonSelected: { 
+    backgroundColor: "#FFD509",  // When clicked, fill with yellow
+  },
+  buttonTextSelected: { 
+    color: "#000"  // Change text to black when clicked
+  },
+  disabledButton: { 
+    backgroundColor: "#555"  // Grey color for disabled state
+  },  
+});
