@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -11,7 +11,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    backgroundColor: '#000000',
+    backgroundColor: '#000',
     padding: 24,
     borderRadius: 12,
     width: '85%',
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 18,
-    color: '#000000',
+    color: '#000',
     fontWeight: 'bold',
   },
   serviceTitle: {
@@ -65,11 +65,11 @@ const styles = StyleSheet.create({
   },
   serviceText: {
     fontSize: 16,
-    color: '#000000',
+    color: '#000',
     fontWeight: 'bold',
   },
   serviceSelected: {
-    backgroundColor: '#000000',
+    backgroundColor: '#000',
     borderWidth: 1,
     borderColor: '#FFD509',
   },
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   totalText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#000',
   },
   button: {
     backgroundColor: '#FFD509',
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     width: '100%',
     alignItems: 'center',
-    shadowColor: '#000000',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
@@ -105,8 +105,11 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 18,
-    color: '#000000',
+    color: '#000',
     fontWeight: 'bold',
+  },
+  disabledButton: {
+    backgroundColor: '#aaa',
   },
 });
 
@@ -123,43 +126,54 @@ export default function BookingScreen() {
   ];
 
   // State Management
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
 
   // Handles Date Selection
-  const onChangeDate = (event: DateTimePickerEvent, date?: Date) => {
+  const onChangeDate = useCallback((event: DateTimePickerEvent, date?: Date) => {
     if (date) {
       setSelectedDate((prev) => new Date(date.setHours(prev.getHours(), prev.getMinutes())));
     }
     setShowDatePicker(false);
-  };
+  }, []);
 
   // Handles Time Selection
-  const onChangeTime = (event: DateTimePickerEvent, time?: Date) => {
+  const onChangeTime = useCallback((event: DateTimePickerEvent, time?: Date) => {
     if (time) {
       setSelectedDate((prev) => new Date(prev.setHours(time.getHours(), time.getMinutes())));
     }
     setShowTimePicker(false);
-  };
+  }, []);
 
   // Toggle Service Selection
-  const toggleService = (serviceId: string, price: number) => {
+  const toggleService = useCallback((serviceId: string, price: number) => {
     setSelectedServices((prevSelected) => {
-      if (prevSelected.includes(serviceId)) {
-        setTotalPrice((prevTotal) => prevTotal - price);
-        return prevSelected.filter(id => id !== serviceId);
-      } else {
-        setTotalPrice((prevTotal) => prevTotal + price);
-        return [...prevSelected, serviceId];
-      }
+      const isSelected = prevSelected.includes(serviceId);
+      setTotalPrice((prevTotal) => (isSelected ? prevTotal - price : prevTotal + price));
+      return isSelected ? prevSelected.filter(id => id !== serviceId) : [...prevSelected, serviceId];
     });
+  }, []);
+
+  // Handle Booking Confirmation
+  const confirmBooking = () => {
+    if (selectedServices.length === 0) return;
+    
+    const formattedTime = selectedDate.toLocaleTimeString();
+    const selectedServicesNames = services
+      .filter(service => selectedServices.includes(service.id))
+      .map(service => service.name)
+      .join(', ');
+
+    router.push(
+      `/confirm?date=${encodeURIComponent(selectedDate.toISOString())}&time=${encodeURIComponent(formattedTime)}&total=${totalPrice}&services=${encodeURIComponent(selectedServicesNames)}`
+    );
   };
 
   return (
-    <LinearGradient colors={['#FFD509', '#000000']} style={styles.container}>
+    <LinearGradient colors={['#FFD509', '#000']} style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Book Your Appointment</Text>
         <Text style={styles.subtitle}>Choose your preferred date & time.</Text>
@@ -168,17 +182,13 @@ export default function BookingScreen() {
         <TouchableOpacity style={styles.option} onPress={() => setShowDatePicker(true)}>
           <Text style={styles.optionText}>📅 {selectedDate.toDateString()}</Text>
         </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker value={selectedDate} mode="date" display="default" onChange={onChangeDate} />
-        )}
+        {showDatePicker && <DateTimePicker value={selectedDate} mode="date" display="default" onChange={onChangeDate} />}
 
         {/* Time Selection */}
         <TouchableOpacity style={styles.option} onPress={() => setShowTimePicker(true)}>
           <Text style={styles.optionText}>⏰ {selectedDate.toLocaleTimeString()}</Text>
         </TouchableOpacity>
-        {showTimePicker && (
-          <DateTimePicker value={selectedDate} mode="time" display="default" onChange={onChangeTime} />
-        )}
+        {showTimePicker && <DateTimePicker value={selectedDate} mode="time" display="default" onChange={onChangeTime} />}
 
         {/* Service Selection */}
         <Text style={styles.serviceTitle}>Select Services:</Text>
@@ -187,18 +197,10 @@ export default function BookingScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[
-                styles.serviceItem,
-                selectedServices.includes(item.id) && styles.serviceSelected,
-              ]}
+              style={[styles.serviceItem, selectedServices.includes(item.id) && styles.serviceSelected]}
               onPress={() => toggleService(item.id, item.price)}
             >
-              <Text
-                style={[
-                  styles.serviceText,
-                  selectedServices.includes(item.id) && styles.serviceTextSelected,
-                ]}
-              >
+              <Text style={[styles.serviceText, selectedServices.includes(item.id) && styles.serviceTextSelected]}>
                 {item.name} - ₹{item.price}
               </Text>
             </TouchableOpacity>
@@ -212,18 +214,8 @@ export default function BookingScreen() {
 
         {/* Confirm Booking Button */}
         <TouchableOpacity
-          style={styles.button}
-          onPress={() => {
-            const formattedTime = selectedDate.toLocaleTimeString();
-            const selectedServicesNames = services
-              .filter(service => selectedServices.includes(service.id))
-              .map(service => service.name)
-              .join(', ');
-
-            router.push(
-              `/confirm?date=${encodeURIComponent(selectedDate.toISOString())}&time=${encodeURIComponent(formattedTime)}&total=${totalPrice}&services=${encodeURIComponent(selectedServicesNames)}`
-            );
-          }}
+          style={[styles.button, selectedServices.length === 0 && styles.disabledButton]}
+          onPress={confirmBooking}
           disabled={selectedServices.length === 0}
         >
           <Text style={styles.buttonText}>Confirm Booking</Text>

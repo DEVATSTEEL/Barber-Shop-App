@@ -4,9 +4,8 @@ import {
   TouchableOpacity, StyleSheet 
 } from "react-native";
 import { auth, db } from "../firebaseConfig";
-import { doc, getDoc } from "firebase/firestore"; // ✅ Firestore functions only
-import { signOut } from "firebase/auth"; // ✅ Corrected import for signOut
-import { Timestamp } from "firebase/firestore"; 
+import { doc, getDoc, Timestamp } from "firebase/firestore"; 
+import { signOut, onAuthStateChanged } from "firebase/auth"; 
 import { useRouter } from "expo-router"; 
 import { FontAwesome } from "@expo/vector-icons"; 
 
@@ -14,42 +13,61 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        Alert.alert("Error", "User not logged in");
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        fetchUserData(user.uid);
+      } else {
         setLoading(false);
-        return;
+        setAlertMessage("User not logged in");
       }
+    });
 
-      try {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          const createdAt = data.createdAt instanceof Timestamp
-            ? data.createdAt.toDate().toLocaleDateString()
-            : "Unknown Date"; 
-
-          setUserData({ ...data, createdAt });
-        } else {
-          Alert.alert("Error", "User not found in Firestore!");
-        }
-      } catch (error) {
-        console.error("❌ Error fetching user data:", error);
-        Alert.alert("Error", "Failed to fetch user data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserData();
+    return () => unsubscribe(); // Cleanup listener on unmount
   }, []);
+
+  useEffect(() => {
+    if (alertMessage) {
+      Alert.alert("Error", alertMessage);
+      setAlertMessage(null);
+    }
+  }, [alertMessage]);
+
+  const fetchUserData = async (uid: string) => {
+    try {
+      const userDocRef = doc(db, "users", uid);
+      console.log("📄 Fetching Firestore Document for UID:", uid);
+
+      const userDoc = await getDoc(userDocRef);
+      console.log("📄 Firestore Document Exists:", userDoc.exists());
+
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        console.log("✅ User Data from Firestore:", data);
+
+        const createdAt = data.createdAt instanceof Timestamp
+          ? data.createdAt.toDate().toLocaleDateString()
+          : "Unknown Date";
+
+        setUserData({ ...data, uid, createdAt });
+      } else {
+        console.error("❌ No user document found in Firestore!");
+        setUserData(null);
+        setAlertMessage("User not found in Firestore!");
+      }
+    } catch (error) {
+      console.error("❌ Error fetching user data:", error);
+      setAlertMessage("Failed to fetch user data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
-      await signOut(auth); // ✅ Use signOut from firebase/auth
+      await signOut(auth); 
       router.replace("/login"); 
     } catch (error) {
       Alert.alert("Error", "Failed to logout. Try again.");
