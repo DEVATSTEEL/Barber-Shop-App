@@ -1,65 +1,62 @@
 import React, { useEffect, useState } from "react";
 import { 
   View, Text, ActivityIndicator, Alert, 
-  TouchableOpacity, StyleSheet 
+  TouchableOpacity, StyleSheet, FlatList 
 } from "react-native";
 import { auth, db } from "../firebaseConfig";
-import { doc, getDoc, Timestamp } from "firebase/firestore"; 
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"; 
 import { signOut, onAuthStateChanged } from "firebase/auth"; 
 import { useRouter } from "expo-router"; 
 import { FontAwesome } from "@expo/vector-icons"; 
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [userData, setUserData] = useState<any>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [bookings, setBookings] = useState<any[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         fetchUserData(user.uid);
+        fetchUserBookings(user.uid);
       } else {
-        setLoading(false);
-        setAlertMessage("User not logged in");
+        router.replace("/login"); // Redirect to login if not authenticated
       }
     });
 
-    return () => unsubscribe(); // Cleanup listener on unmount
+    return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (alertMessage) {
-      Alert.alert("Error", alertMessage);
-      setAlertMessage(null);
-    }
-  }, [alertMessage]);
 
   const fetchUserData = async (uid: string) => {
     try {
       const userDocRef = doc(db, "users", uid);
-      console.log("📄 Fetching Firestore Document for UID:", uid);
-
       const userDoc = await getDoc(userDocRef);
-      console.log("📄 Firestore Document Exists:", userDoc.exists());
 
       if (userDoc.exists()) {
-        const data = userDoc.data();
-        console.log("✅ User Data from Firestore:", data);
-
-        const createdAt = data.createdAt instanceof Timestamp
-          ? data.createdAt.toDate().toLocaleDateString()
-          : "Unknown Date";
-
-        setUserData({ ...data, uid, createdAt });
+        setUserName(userDoc.data().name || "User");
       } else {
-        console.error("❌ No user document found in Firestore!");
-        setUserData(null);
-        setAlertMessage("User not found in Firestore!");
+        Alert.alert("Error", "User not found in Firestore!");
       }
     } catch (error) {
-      console.error("❌ Error fetching user data:", error);
-      setAlertMessage("Failed to fetch user data");
+      Alert.alert("Error", "Failed to fetch user details");
+    }
+  };
+
+  const fetchUserBookings = async (uid: string) => {
+    try {
+      const bookingsRef = collection(db, "bookings");
+      const q = query(bookingsRef, where("userId", "==", uid));
+
+      const snapshot = await getDocs(q);
+      const userBookings = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setBookings(userBookings);
+    } catch (error) {
+      Alert.alert("Error", "Failed to fetch bookings");
     } finally {
       setLoading(false);
     }
@@ -67,33 +64,52 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth); 
-      router.replace("/login"); 
+      await signOut(auth);
+      setUserName(null); // Clear user state
+      setBookings([]);   // Clear bookings
+      router.replace("/login");
     } catch (error) {
-      Alert.alert("Error", "Failed to logout. Try again.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      Alert.alert("Logout Failed", errorMessage);
     }
   };
+  
 
   if (loading) return <ActivityIndicator size="large" color="#FFD509" />;
 
   return (
     <View style={styles.container}>
-      <FontAwesome name="user-circle" size={100} color="#FFD509" style={styles.profileIcon} />
-      <Text style={styles.title}>Profile</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.userName}>{userName}</Text>
+        <FontAwesome name="user-circle" size={40} color="#FFD509" />
+      </View>
 
-      {userData ? (
-        <>
-          <Text style={styles.info}>📧 Email: {userData.email}</Text>
-          <Text style={styles.info}>🆔 UID: {userData.uid}</Text>
-          <Text style={styles.info}>📅 Joined On: {userData.createdAt}</Text>
+      {/* Bookings Section */}
+      <View style={styles.bookingsBox}>
+        <Text style={styles.boxTitle}>Your Bookings</Text>
 
-          <TouchableOpacity style={styles.button} onPress={handleLogout}>
-            <Text style={styles.buttonText}>LOGOUT</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <Text style={styles.errorText}>User not found.</Text>
-      )}
+        {bookings.length > 0 ? (
+          <FlatList
+            data={bookings}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.bookingItem}>
+                <Text style={styles.bookingText}>
+                  📅 {item.date} 🕒 {item.time} 📍 {item.location}
+                </Text>
+              </View>
+            )}
+          />
+        ) : (
+          <Text style={styles.noBookings}>No bookings found</Text>
+        )}
+      </View>
+
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.button} onPress={handleLogout}>
+        <Text style={styles.buttonText}>LOGOUT</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -101,24 +117,48 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center",
     backgroundColor: "#000000",
     padding: 20 
   },
-  profileIcon: {
-    marginBottom: 20,
+  header: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center",
+    marginBottom: 20
   },
-  title: {
-    fontSize: 28,
+  userName: { 
+    fontSize: 20, 
+    fontWeight: "bold", 
+    color: "#FFD509" 
+  },
+  bookingsBox: {
+    backgroundColor: "#FFD509",
+    padding: 15,
+    borderRadius: 10,
+    width: "100%",
+  },
+  boxTitle: {
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#FFD509",
-    marginBottom: 20,
-  },
-  info: {
-    fontSize: 16,
-    color: "#FFD509",
+    color: "#000",
+    textAlign: "center",
     marginBottom: 10,
+  },
+  bookingItem: {
+    backgroundColor: "#000",
+    padding: 10,
+    marginVertical: 5,
+    borderRadius: 8,
+  },
+  bookingText: {
+    color: "#FFD509",
+    textAlign: "center",
+    fontWeight: "bold",
+  },
+  noBookings: {
+    textAlign: "center",
+    color: "#000",
+    fontSize: 16,
   },
   button: {
     marginTop: 20,
@@ -127,15 +167,11 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     width: "80%",
     alignItems: "center",
+    alignSelf: "center"
   },
   buttonText: {
     color: "#000000",
     fontSize: 18,
     fontWeight: "bold",
-  },
-  errorText: {
-    color: "#FFD509",
-    fontSize: 18,
-    marginTop: 10,
-  },
+  }
 });
