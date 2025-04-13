@@ -37,7 +37,7 @@ const HomeScreen = () => {
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           {/* Title Section */}
           <ThemedView style={styles.titleContainer}>
-            <ThemedText type="title" style={styles.welcomeText}>Welcome to BarberX! ✂️</ThemedText>
+            <ThemedText type="title" style={styles.welcomeText}>Welcome to Groom & Glow✂️</ThemedText>
             <HelloWave />
           </ThemedView>
 
